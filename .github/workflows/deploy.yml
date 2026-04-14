@@ -2,25 +2,29 @@ name: Build and Push to Amazon ECR
 
 on:
   push:
+    # Trigger on main branch updates
     branches:
       - main
+    # Trigger on version tags pushed to the repo (e.g., v1.0.0, v1.2)
+    tags:
+      - 'v*'
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}                   # Securely injected AWS Region
-  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}           # Securely injected ECR repository name
+  AWS_REGION: ${{ secrets.AWS_REGION }}                   
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}           
 
 jobs:
   build-and-push:
-    name: Build, Tag, and Push Config
+    name: Build and Push to ECR
     runs-on: ubuntu-latest
     environment: production
 
     steps:
-    # 1. Checkout the source code from the main branch
+    # 1. Extract the repository files
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    # 2. Authenticate cleanly with AWS using Secrets
+    # 2. Authenticate cleanly with AWS using your secrets
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -28,26 +32,47 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
-    # 3. Log the GitHub Actions runner into Amazon ECR natively
+    # 3. Log into the Elastic Container Registry dynamically
     - name: Login to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
-      
-    # 4. Build, Tag, and Push the Docker images to your ECR Repository
-    - name: Build, tag, and push image to Amazon ECR
+
+    # 4. Process semantic tag names or short SHAs depending on git event
+    - name: Determine Docker Tags
+      id: set-tags
+      run: |
+        # Generate the highly traceable 7-character Git SHA
+        SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+        
+        # Determine the Git Reference trigger source
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          # If a tag was pushed (like v1.0.0), extract just the tag string
+          VERSION_TAG=${GITHUB_REF#refs/tags/}
+          echo "Target tags: $VERSION_TAG"
+          echo "tags=$VERSION_TAG" >> $GITHUB_OUTPUT
+        else
+          # If a standard branch push, use the 'latest' and 'build-<short-sha>' formats
+          echo "Target tags: latest, build-$SHORT_SHA"
+          echo "tags=latest,build-$SHORT_SHA" >> $GITHUB_OUTPUT
+        fi
+
+    # 5. Execute build, apply dynamic tags, and upload
+    - name: Build, Tag, and Push Images
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}  # GitHub's unique commit SHA identifier
-      working-directory: .
+        TARGET_TAGS: ${{ steps.set-tags.outputs.tags }}
       run: |
-        # Build the docker container natively inside the runner
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        # Compile standard image block temporarily
+        docker build -t temporary-backend-image .
         
-        # Identify the exact same image securely with the generic "latest" tag
-        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        # Split target tags natively via comma separation
+        IFS=',' read -ra TAG_ARRAY <<< "$TARGET_TAGS"
         
-        # Push the versioned snapshot to Amazon ECR
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        
-        # Push the generic reference over to Amazon ECR
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        # Sequentially tag and push every required label to ECR
+        for TAG in "${TAG_ARRAY[@]}"; do
+          echo "Applying tag: $TAG"
+          docker tag temporary-backend-image $ECR_REGISTRY/$ECR_REPOSITORY:$TAG
+          
+          echo "Pushing snapshot: $TAG"
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$TAG
+        done

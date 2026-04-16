@@ -10,8 +10,10 @@ on:
       - 'v*'
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}                   
-  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}           
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+  ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
 
 jobs:
   build-and-push:
@@ -76,3 +78,15 @@ jobs:
           echo "Pushing snapshot: $TAG"
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$TAG
         done
+
+    # ── ECS DEPLOYMENT (NEW) ────────────────────────────────────────────────
+    # 6. Force ECS to pull the freshly pushed image and restart Fargate tasks
+    - name: Deploy to Amazon ECS
+      run: |
+        echo "Triggering ECS force-new-deployment..."
+        aws ecs update-service \
+          --region $AWS_REGION \
+          --cluster $ECS_CLUSTER \
+          --service $ECS_SERVICE \
+          --force-new-deployment
+        echo "ECS deployment triggered successfully."

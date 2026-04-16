@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const FoodItem = require('../models/FoodItem');
 
 // @desc    Get all food items
@@ -29,9 +30,19 @@ exports.createFood = async (req, res, next) => {
 // @access  Private/Admin
 exports.updateFood = async (req, res, next) => {
     try {
+        console.log(`[UPDATE FOOD API] Updating ID: ${req.params.id}`);
+        console.log(`[UPDATE FOOD API] Request Body Payload:`, req.body);
+
+        // Validate MongoDB ObjectId
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            console.log(`[UPDATE FOOD API] Invalid ObjectId: ${req.params.id}`);
+            return res.status(400).json({ success: false, error: 'Invalid ID format' });
+        }
+
         let food = await FoodItem.findById(req.params.id);
 
         if (!food) {
+            console.log(`[UPDATE FOOD API] Food item not found in DB`);
             return res.status(404).json({ success: false, error: 'Food item not found' });
         }
 
@@ -40,9 +51,11 @@ exports.updateFood = async (req, res, next) => {
             runValidators: true
         });
 
+        console.log(`[UPDATE FOOD API] Update successful`);
         res.status(200).json({ success: true, data: food });
     } catch (error) {
-        next(error);
+        console.error(`[UPDATE FOOD API] Internal Server Error:`, error.message);
+        res.status(500).json({ success: false, error: 'Internal Server Error' });
     }
 };
 

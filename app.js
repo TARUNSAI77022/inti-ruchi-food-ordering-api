@@ -27,6 +27,11 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/categories', categoryRoutes);
 
+// Health check — no auth, no DB, always 200
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
+
 app.get('/', (req, res) => {
     res.send('API is running for Inti Ruchi Bhojanam...');
 });

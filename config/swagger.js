@@ -1,5 +1,10 @@
 const swaggerJSDoc = require('swagger-jsdoc');
 
+const isProduction = process.env.NODE_ENV === 'production';
+const serverUrl = isProduction
+    ? process.env.BASE_URL || 'http://localhost:5000'
+    : 'http://localhost:5000';
+
 const options = {
     definition: {
         openapi: '3.0.0',
@@ -10,9 +15,13 @@ const options = {
         },
         servers: [
             {
-                url: 'http://localhost:5000',
-                description: 'Development server',
+                url: serverUrl,
+                description: isProduction ? 'Production server (AWS ECS)' : 'Development server',
             },
+            ...(!isProduction
+                ? []
+                : [{ url: 'http://localhost:5000', description: 'Local development server' }]
+            ),
         ],
         components: {
             securitySchemes: {

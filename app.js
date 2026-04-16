@@ -13,9 +13,16 @@ const app = express();
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 
+// CORS Configuration
+const corsOptions = {
+    origin: process.env.FRONTEND_URL || '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
 // Middleware
 app.use(express.json());
-app.use(cors());
+app.use(cors(corsOptions));
 
 // Swagger Docs Route
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

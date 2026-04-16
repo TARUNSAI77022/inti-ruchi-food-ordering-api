@@ -1,5 +1,5 @@
 const express = require('express');
-const { getFoods, createFood, updateFood, deleteFood } = require('../controllers/foodController');
+const { getFoods, getFood, createFood, updateFood, deleteFood } = require('../controllers/foodController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -32,6 +32,10 @@ const router = express.Router();
  *                 type: number
  *               category:
  *                 type: string
+ *                 description: CATEGORY_ID
+ *               mealType:
+ *                 type: string
+ *                 description: MEALTYPE_ID
  *               image:
  *                 type: string
  *               available:
@@ -47,6 +51,19 @@ router.route('/')
 /**
  * @swagger
  * /api/foods/{id}:
+ *   get:
+ *     summary: Get single food item
+ *     tags: [Foods]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
  *   put:
  *     summary: Update food item (Admin only)
  *     tags: [Foods]
@@ -63,8 +80,22 @@ router.route('/')
  *           schema:
  *             type: object
  *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
  *               price:
  *                 type: number
+ *               category:
+ *                 type: string
+ *                 description: CATEGORY_ID
+ *               mealType:
+ *                 type: string
+ *                 description: MEALTYPE_ID
+ *               image:
+ *                 type: string
+ *               available:
+ *                 type: boolean
  *     responses:
  *       200:
  *         description: Updated
@@ -82,6 +113,7 @@ router.route('/')
  *         description: Deleted
  */
 router.route('/:id')
+    .get(getFood)
     .put(protect, authorize('admin'), updateFood)
     .delete(protect, authorize('admin'), deleteFood);
 

@@ -1,22 +1,22 @@
 const express = require('express');
-const { getCategories, getCategory, createCategory, updateCategory, deleteCategory } = require('../controllers/categoryController');
+const { getMealTypes, getMealType, createMealType, updateMealType, deleteMealType } = require('../controllers/mealTypeController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
 /**
  * @swagger
- * /api/categories:
+ * /api/meal-types:
  *   get:
- *     summary: Get all categories
- *     tags: [Categories]
+ *     summary: Get all meal types
+ *     tags: [MealTypes]
  *     security: []
  *     responses:
  *       200:
  *         description: Success
  *   post:
- *     summary: Create a category (Admin only)
- *     tags: [Categories]
+ *     summary: Create a meal type (Admin only)
+ *     tags: [MealTypes]
  *     requestBody:
  *       required: true
  *       content:
@@ -35,15 +35,15 @@ const router = express.Router();
  *         description: Created
  */
 router.route('/')
-    .get(getCategories)
-    .post(protect, authorize('admin'), createCategory);
+    .get(getMealTypes)
+    .post(protect, authorize('admin'), createMealType);
 
 /**
  * @swagger
- * /api/categories/{id}:
+ * /api/meal-types/{id}:
  *   get:
- *     summary: Get a category by ID
- *     tags: [Categories]
+ *     summary: Get a meal type by ID
+ *     tags: [MealTypes]
  *     security: []
  *     parameters:
  *       - in: path
@@ -55,8 +55,8 @@ router.route('/')
  *       200:
  *         description: Success
  *   put:
- *     summary: Update a category (Admin only)
- *     tags: [Categories]
+ *     summary: Update a meal type (Admin only)
+ *     tags: [MealTypes]
  *     parameters:
  *       - in: path
  *         name: id
@@ -78,8 +78,8 @@ router.route('/')
  *       200:
  *         description: Updated
  *   delete:
- *     summary: Delete a category (Admin only)
- *     tags: [Categories]
+ *     summary: Delete a meal type (Admin only)
+ *     tags: [MealTypes]
  *     parameters:
  *       - in: path
  *         name: id
@@ -91,8 +91,8 @@ router.route('/')
  *         description: Deleted
  */
 router.route('/:id')
-    .get(getCategory)
-    .put(protect, authorize('admin'), updateCategory)
-    .delete(protect, authorize('admin'), deleteCategory);
+    .get(getMealType)
+    .put(protect, authorize('admin'), updateMealType)
+    .delete(protect, authorize('admin'), deleteMealType);
 
 module.exports = router;

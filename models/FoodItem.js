@@ -15,8 +15,14 @@ const foodItemSchema = new mongoose.Schema({
         required: [true, 'Please add a price']
     },
     category: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category',
         required: [true, 'Please add a category']
+    },
+    mealType: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'MealType',
+        required: [true, 'Please add a meal type']
     },
     image: {
         type: String,

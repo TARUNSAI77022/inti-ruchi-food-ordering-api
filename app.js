@@ -7,6 +7,7 @@ const foodRoutes = require('./routes/foodRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const mealTypeRoutes = require('./routes/mealTypeRoutes');
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use('/api/foods', foodRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/meal-types', mealTypeRoutes);
 
 // Health check — no auth, no DB, always 200
 app.get('/api/health', (req, res) => {

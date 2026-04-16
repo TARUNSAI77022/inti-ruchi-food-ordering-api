@@ -5,6 +5,24 @@ const MealType = require('../models/MealType');
 
 const isObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id));
 
+const formatFoodResponse = (food) => {
+    return {
+        _id: food._id,
+        name: food.name,
+        description: food.description,
+        price: food.price,
+        image: food.image,
+        imageUrl: food.image, // mirror
+        available: food.available,
+        createdAt: food.createdAt,
+        updatedAt: food.updatedAt,
+        category: food.category,
+        mealType: food.mealType,
+        categoryName: food.category?.name || null,
+        mealTypeName: food.mealType?.name || null
+    };
+};
+
 const resolveFilter = async (model, input) => {
     if (!input) return null;
 
@@ -72,21 +90,7 @@ exports.getFoods = async (req, res, next) => {
             .populate('mealType', 'name')
             .lean();
 
-        const formattedFoods = foods.map(food => ({
-            _id: food._id,
-            name: food.name,
-            description: food.description,
-            price: food.price,
-            image: food.image,
-            imageUrl: food.imageUrl,
-            available: food.available,
-            createdAt: food.createdAt,
-            updatedAt: food.updatedAt,
-            category: food.category,
-            mealType: food.mealType,
-            categoryName: food.category?.name || null,
-            mealTypeName: food.mealType?.name || null
-        }));
+        const formattedFoods = foods.map(formatFoodResponse);
 
         res.status(200).json({ success: true, count: formattedFoods.length, data: formattedFoods });
     } catch (error) {
@@ -112,23 +116,7 @@ exports.getFood = async (req, res, next) => {
             return res.status(404).json({ success: false, error: 'Food item not found' });
         }
 
-        const formattedFood = {
-            _id: food._id,
-            name: food.name,
-            description: food.description,
-            price: food.price,
-            image: food.image,
-            imageUrl: food.imageUrl,
-            available: food.available,
-            createdAt: food.createdAt,
-            updatedAt: food.updatedAt,
-            category: food.category,
-            mealType: food.mealType,
-            categoryName: food.category?.name || null,
-            mealTypeName: food.mealType?.name || null
-        };
-
-        res.status(200).json({ success: true, data: formattedFood });
+        res.status(200).json({ success: true, data: formatFoodResponse(food) });
     } catch (error) {
         next(error);
     }
@@ -163,8 +151,11 @@ exports.createFood = async (req, res, next) => {
             }
         }
 
-        const food = await FoodItem.create(req.body);
-        res.status(201).json({ success: true, data: food });
+        if (req.body.imageUrl && !req.body.image) req.body.image = req.body.imageUrl;
+
+        let food = await FoodItem.create(req.body);
+        food = await FoodItem.findById(food._id).populate('category', 'name').populate('mealType', 'name').lean();
+        res.status(201).json({ success: true, data: formatFoodResponse(food) });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -215,13 +206,15 @@ exports.updateFood = async (req, res, next) => {
             return res.status(404).json({ success: false, error: 'Food item not found' });
         }
 
+        if (req.body.imageUrl && !req.body.image) req.body.image = req.body.imageUrl;
+
         food = await FoodItem.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
             runValidators: true
-        });
+        }).populate('category', 'name').populate('mealType', 'name').lean();
 
         console.log(`[UPDATE FOOD API] Update successful`);
-        res.status(200).json({ success: true, data: food });
+        res.status(200).json({ success: true, data: formatFoodResponse(food) });
     } catch (error) {
         console.error(`[UPDATE FOOD API] Internal Server Error:`, error.message);
         res.status(500).json({ success: false, error: 'Internal Server Error' });

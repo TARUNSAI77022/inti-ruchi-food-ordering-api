@@ -76,9 +76,8 @@ const orderSchema = new mongoose.Schema({
 });
 
 // Global filter for soft delete
-orderSchema.pre(/^find/, function(next) {
-    this.find({ isDeleted: { $ne: true } });
-    next();
+orderSchema.pre(/^find/, function() {
+    this.where({ isDeleted: { $ne: true } });
 });
 
 // Indexes for performance

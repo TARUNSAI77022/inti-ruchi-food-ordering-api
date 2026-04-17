@@ -36,7 +36,7 @@ const router = express.Router();
  *               mealType:
  *                 type: string
  *                 description: MEALTYPE_ID
- *               image:
+ *               imageUrl:
  *                 type: string
  *               available:
  *                 type: boolean
@@ -92,7 +92,7 @@ router.route('/')
  *               mealType:
  *                 type: string
  *                 description: MEALTYPE_ID
- *               image:
+ *               imageUrl:
  *                 type: string
  *               available:
  *                 type: boolean

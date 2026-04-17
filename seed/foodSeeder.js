@@ -50,7 +50,7 @@ const extractData = () => {
                 description: item.description || 'Authentic and traditional regional recipe.',
                 price: numericPrice,
                 category: category,
-                image: getDishImage(item.name),
+                imageUrl: getDishImage(item.name),
                 available: true
             });
         }

@@ -11,8 +11,7 @@ const formatFoodResponse = (food) => {
         name: food.name,
         description: food.description,
         price: food.price,
-        image: food.image,
-        imageUrl: food.image, // mirror
+        imageUrl: food.imageUrl,
         available: food.available,
         createdAt: food.createdAt,
         updatedAt: food.updatedAt,
@@ -98,6 +97,24 @@ exports.getFoods = async (req, res, next) => {
     }
 };
 
+// @desc    Get all food items (Admin only - includes unavailable)
+// @route   GET /api/admin/foods
+// @access  Private/Admin
+exports.getAdminFoods = async (req, res, next) => {
+    try {
+        const foods = await FoodItem.find()
+            .populate('category', 'name')
+            .populate('mealType', 'name')
+            .lean();
+
+        const formattedFoods = foods.map(formatFoodResponse);
+
+        res.status(200).json({ success: true, count: formattedFoods.length, data: formattedFoods });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // @desc    Get single food item
 // @route   GET /api/foods/:id
 // @access  Public
@@ -151,7 +168,9 @@ exports.createFood = async (req, res, next) => {
             }
         }
 
-        if (req.body.imageUrl && !req.body.image) req.body.image = req.body.imageUrl;
+        if (!req.body.imageUrl) {
+            req.body.imageUrl = 'https://via.placeholder.com/300';
+        }
 
         let food = await FoodItem.create(req.body);
         food = await FoodItem.findById(food._id).populate('category', 'name').populate('mealType', 'name').lean();
@@ -205,8 +224,6 @@ exports.updateFood = async (req, res, next) => {
             console.log(`[UPDATE FOOD API] Food item not found in DB`);
             return res.status(404).json({ success: false, error: 'Food item not found' });
         }
-
-        if (req.body.imageUrl && !req.body.image) req.body.image = req.body.imageUrl;
 
         food = await FoodItem.findByIdAndUpdate(req.params.id, req.body, {
             new: true,

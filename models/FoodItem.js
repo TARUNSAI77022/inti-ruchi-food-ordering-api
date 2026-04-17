@@ -24,9 +24,9 @@ const foodItemSchema = new mongoose.Schema({
         ref: 'MealType',
         required: [true, 'Please add a meal type']
     },
-    image: {
+    imageUrl: {
         type: String,
-        default: 'no-photo.jpg'
+        default: 'https://via.placeholder.com/300'
     },
     available: {
         type: Boolean,

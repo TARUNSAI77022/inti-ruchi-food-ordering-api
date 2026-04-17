@@ -84,6 +84,5 @@ orderSchema.pre(/^find/, function() {
 orderSchema.index({ userId: 1 });
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ status: 1 });
-orderSchema.index({ orderNumber: 1 }, { unique: true });
 
 module.exports = mongoose.model('Order', orderSchema);

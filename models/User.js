@@ -25,6 +25,21 @@ const userSchema = new mongoose.Schema({
         type: String,
         enum: ['user', 'admin'],
         default: 'user'
+    },
+    tokenVersion: {
+        type: Number,
+        default: 0
+    },
+    loginAttempts: {
+        type: Number,
+        required: true,
+        default: 0
+    },
+    lockUntil: {
+        type: Number
+    },
+    refreshToken: {
+        type: String
     }
 }, {
     timestamps: true

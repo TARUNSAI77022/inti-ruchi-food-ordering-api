@@ -17,10 +17,14 @@ const orderSchema = new mongoose.Schema({
                 type: Number,
                 required: true,
                 min: 1
+            },
+            price: {
+                type: Number,
+                required: true
             }
         }
     ],
-    totalPrice: {
+    totalAmount: {
         type: Number,
         required: true,
         default: 0.0
@@ -30,9 +34,57 @@ const orderSchema = new mongoose.Schema({
         required: true,
         enum: ['pending', 'preparing', 'delivered', 'cancelled'],
         default: 'pending'
+    },
+    paymentStatus: {
+        type: String,
+        enum: ['pending', 'paid', 'failed'],
+        default: 'pending'
+    },
+    idempotencyKey: {
+        type: String,
+        unique: true,
+        sparse: true // Only if provided
+    },
+    orderNumber: {
+        type: String,
+        unique: true,
+        required: true
+    },
+    paymentId: {
+        type: String
+    },
+    paymentSignature: {
+        type: String
+    },
+    isDeleted: {
+        type: Boolean,
+        default: false,
+        select: false
+    },
+    deletedAt: {
+        type: Date
+    },
+    deletedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    paymentGateway: {
+        type: String
     }
 }, {
     timestamps: true
 });
+
+// Global filter for soft delete
+orderSchema.pre(/^find/, function(next) {
+    this.find({ isDeleted: { $ne: true } });
+    next();
+});
+
+// Indexes for performance
+orderSchema.index({ userId: 1 });
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ status: 1 });
+orderSchema.index({ orderNumber: 1 }, { unique: true });
 
 module.exports = mongoose.model('Order', orderSchema);

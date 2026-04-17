@@ -1,6 +1,7 @@
 const express = require('express');
 const { getFoods, getFood, createFood, updateFood, deleteFood } = require('../controllers/foodController');
 const { protect, authorize } = require('../middleware/authMiddleware');
+const auditLogger = require('../middleware/auditMiddleware');
 
 const router = express.Router();
 
@@ -46,7 +47,7 @@ const router = express.Router();
  */
 router.route('/')
     .get(getFoods)
-    .post(protect, authorize('admin'), createFood);
+    .post(protect, authorize('admin'), auditLogger('Created Food Item'), createFood);
 
 /**
  * @swagger
@@ -114,7 +115,7 @@ router.route('/')
  */
 router.route('/:id')
     .get(getFood)
-    .put(protect, authorize('admin'), updateFood)
-    .delete(protect, authorize('admin'), deleteFood);
+    .put(protect, authorize('admin'), auditLogger('Updated Food Item'), updateFood)
+    .delete(protect, authorize('admin'), auditLogger('Deleted Food Item'), deleteFood);
 
 module.exports = router;

@@ -1,5 +1,5 @@
 const express = require('express');
-const { createOrder, getOrders, getMyOrders, updateOrderStatus } = require('../controllers/orderController');
+const { createOrder, getOrders, getMyOrders, getOrderById, updateOrderStatus, deleteOrder } = require('../controllers/orderController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -26,7 +26,7 @@ const router = express.Router();
  *                       type: string
  *                     quantity:
  *                       type: number
- *               totalPrice:
+ *               totalAmount:
  *                 type: number
  *     responses:
  *       201:
@@ -53,6 +53,38 @@ router.route('/')
  *         description: User's orders
  */
 router.route('/my').get(protect, getMyOrders);
+
+/**
+ * @swagger
+ * /api/orders/{id}:
+ *   get:
+ *     summary: Get single order details
+ *     tags: [Orders]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ *   delete:
+ *     summary: Soft delete order (Admin only)
+ *     tags: [Orders]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ */
+router.route('/:id')
+    .get(protect, getOrderById)
+    .delete(protect, authorize('admin'), deleteOrder);
 
 /**
  * @swagger

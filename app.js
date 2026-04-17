@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const errorHandler = require('./middleware/errorMiddleware');
 
 const authRoutes = require('./routes/authRoutes');
@@ -23,6 +24,7 @@ const corsOptions = {
 
 // Middleware
 app.use(express.json());
+app.use(helmet());
 app.use(cors(corsOptions));
 
 // Swagger Docs Route

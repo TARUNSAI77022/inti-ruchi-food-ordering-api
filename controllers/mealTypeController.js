@@ -6,8 +6,7 @@ exports.createMealType = async (req, res, next) => {
         const mealType = await MealType.create(req.body);
         res.status(201).json({ success: true, data: mealType });
     } catch (error) {
-        if (error.code === 11000) return res.status(400).json({ success: false, error: 'Meal Type name must be unique' });
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
@@ -16,7 +15,7 @@ exports.getMealTypes = async (req, res, next) => {
         const mealTypes = await MealType.find();
         res.status(200).json({ success: true, count: mealTypes.length, data: mealTypes });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
@@ -27,7 +26,7 @@ exports.getMealType = async (req, res, next) => {
         if (!mealType) return res.status(404).json({ success: false, error: 'Meal Type not found' });
         res.status(200).json({ success: true, data: mealType });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
@@ -38,8 +37,7 @@ exports.updateMealType = async (req, res, next) => {
         if (!mealType) return res.status(404).json({ success: false, error: 'Meal Type not found' });
         res.status(200).json({ success: true, data: mealType });
     } catch (error) {
-        if (error.code === 11000) return res.status(400).json({ success: false, error: 'Meal Type name must be unique' });
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
@@ -50,6 +48,6 @@ exports.deleteMealType = async (req, res, next) => {
         if (!mealType) return res.status(404).json({ success: false, error: 'Meal Type not found' });
         res.status(200).json({ success: true, data: {} });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };

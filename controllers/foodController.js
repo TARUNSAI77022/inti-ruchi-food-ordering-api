@@ -176,7 +176,7 @@ exports.createFood = async (req, res, next) => {
         food = await FoodItem.findById(food._id).populate('category', 'name').populate('mealType', 'name').lean();
         res.status(201).json({ success: true, data: formatFoodResponse(food) });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
@@ -233,8 +233,7 @@ exports.updateFood = async (req, res, next) => {
         console.log(`[UPDATE FOOD API] Update successful`);
         res.status(200).json({ success: true, data: formatFoodResponse(food) });
     } catch (error) {
-        console.error(`[UPDATE FOOD API] Internal Server Error:`, error.message);
-        res.status(500).json({ success: false, error: 'Internal Server Error' });
+        next(error);
     }
 };
 

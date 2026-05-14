@@ -1,0 +1,209 @@
+# ============================================================
+# Workflow: Build, Push to ECR, and Blue/Green Deploy to ECS
+# ============================================================
+#
+# Trigger rules:
+#   ✅ Push to 'main'   → Build + Push + Blue/Green Deploy via CodeDeploy
+#   ✅ Push a version tag (e.g. v1.0.0) → Build + Push ONLY
+#                                          (No ECS deploy for release tags)
+# ============================================================
+
+name: ECS Blue/Green Deployment
+
+on:
+  push:
+    branches:
+      - main          # Runs full pipeline: build + push + ECS Blue/Green deploy
+    tags:
+      - 'v*'          # Runs only: build + push (no ECS deploy)
+
+# ── Global environment variables ────────────────────────────
+# These are loaded from GitHub Secrets (Settings → Environments → main → Secrets)
+env:
+  AWS_REGION:                  ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY:              ${{ secrets.ECR_REPOSITORY }}
+  ECS_CLUSTER:                 ${{ secrets.ECS_CLUSTER }}
+  ECS_SERVICE:                 ${{ secrets.ECS_SERVICE }}
+  CODEDEPLOY_APP:              ${{ secrets.CODEDEPLOY_APP }}
+  CODEDEPLOY_DEPLOYMENT_GROUP: ${{ secrets.CODEDEPLOY_DEPLOYMENT_GROUP }}
+  TASK_DEFINITION_FAMILY:      ${{ secrets.TASK_DEFINITION_FAMILY }}
+  CONTAINER_NAME:              ${{ secrets.CONTAINER_NAME }}
+
+# ── Jobs ────────────────────────────────────────────────────
+jobs:
+
+  # ──────────────────────────────────────────────────────────
+  # JOB 1: Build the Docker image and push it to Amazon ECR
+  # ──────────────────────────────────────────────────────────
+  build-and-push:
+    name: Build and Push Docker Image to ECR
+    runs-on: ubuntu-latest
+    environment: main
+    
+    # Declare the output so the deploy job can use the exact image URI
+    outputs:
+      image_uri: ${{ steps.set-image-uri.outputs.image_uri }}
+
+    steps:
+      # ── Step 1 ─────────────────────────────────────────────
+      # Pull the latest source code from the repository
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      # ── Step 2 ─────────────────────────────────────────────
+      # Authenticate GitHub Actions runner with AWS
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      # ── Step 3 ─────────────────────────────────────────────
+      # Get a temporary login token to push images into ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ── Step 4 ─────────────────────────────────────────────
+      # Decide what tag(s) to apply to the Docker image
+      - name: Determine Image Tags
+        id: set-tags
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION_TAG="${GITHUB_REF#refs/tags/}"
+            echo "Event: version tag push → tagging as $VERSION_TAG"
+            echo "tags=$VERSION_TAG" >> $GITHUB_OUTPUT
+          else
+            echo "Event: branch push → tagging as latest + build-$SHORT_SHA"
+            echo "tags=latest,build-$SHORT_SHA" >> $GITHUB_OUTPUT
+            
+            # Save the primary image tag for the deployment job
+            echo "primary_tag=build-$SHORT_SHA" >> $GITHUB_OUTPUT
+          fi
+
+      # ── Step 5 ─────────────────────────────────────────────
+      # Build, tag, and push the Docker image
+      - name: Build and Push Docker Image
+        env:
+          ECR_REGISTRY:  ${{ steps.login-ecr.outputs.registry }}
+          TARGET_TAGS:   ${{ steps.set-tags.outputs.tags }}
+        run: |
+          echo "Building Docker image..."
+          docker build -t backend-image .
+
+          IFS=',' read -ra TAG_ARRAY <<< "$TARGET_TAGS"
+          for TAG in "${TAG_ARRAY[@]}"; do
+            FULL_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$TAG"
+            echo "Tagging → $FULL_IMAGE"
+            docker tag backend-image "$FULL_IMAGE"
+
+            echo "Pushing → $FULL_IMAGE"
+            docker push "$FULL_IMAGE"
+          done
+          
+          echo "✅ All images pushed to ECR successfully."
+
+      # ── Step 6 ─────────────────────────────────────────────
+      # Output the exact image URI for the deployment job to use
+      - name: Output Image URI for Deployment
+        id: set-image-uri
+        if: github.ref == 'refs/heads/main'
+        run: |
+          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.set-tags.outputs.primary_tag }}"
+          echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
+          echo "Deployment will use image: $IMAGE_URI"
+
+  # ──────────────────────────────────────────────────────────
+  # JOB 2: Deploy to ECS using AWS CodeDeploy (Blue/Green)
+  #
+  # ⚠️  Runs ONLY when the trigger is a push to 'main' branch.
+  #     Skipped entirely for version tags (v1.0.0, etc.)
+  # ──────────────────────────────────────────────────────────
+  deploy-bluegreen:
+    name: Blue/Green Deploy to ECS
+    runs-on: ubuntu-latest
+    environment: main
+    needs: build-and-push
+    
+    # Ensures ECS deploy is skipped for tag pushes
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      # ── Step 1 ─────────────────────────────────────────────
+      # Re-authenticate with AWS (each job gets a fresh runner)
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      # ── Step 2 ─────────────────────────────────────────────
+      # Download the latest active task definition JSON
+      - name: Download Existing Task Definition
+        run: |
+          echo "Downloading latest task definition for family: ${{ env.TASK_DEFINITION_FAMILY }}"
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.TASK_DEFINITION_FAMILY }} \
+            --query taskDefinition > task-definition.json
+
+      # ── Step 3 ─────────────────────────────────────────────
+      # Insert the new ECR image URI into the task definition JSON
+      - name: Render new image into Task Definition
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ needs.build-and-push.outputs.image_uri }}
+
+      # ── Step 4 ─────────────────────────────────────────────
+      # Generate the AppSpec file required by AWS CodeDeploy
+      - name: Generate AppSpec file dynamically
+        run: |
+          echo "Generating appspec.yaml..."
+          
+          # Dynamically fetch the container port from the current ECS service configuration
+          CONTAINER_PORT=$(aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+            --query "services[0].loadBalancers[0].containerPort" \
+            --output text)
+            
+          if [ "$CONTAINER_PORT" == "None" ] || [ -z "$CONTAINER_PORT" ]; then
+            echo "⚠️ Could not find ContainerPort in ECS service. Defaulting to 80."
+            CONTAINER_PORT=80
+          fi
+
+          echo "Container Port selected: $CONTAINER_PORT"
+
+          cat <<EOF > appspec.yaml
+          version: 0.0
+          Resources:
+            - TargetService:
+                Type: AWS::ECS::Service
+                Properties:
+                  TaskDefinition: <TASK_DEFINITION>
+                  LoadBalancerInfo:
+                    ContainerName: "${{ env.CONTAINER_NAME }}"
+                    ContainerPort: $CONTAINER_PORT
+          EOF
+          
+          echo "✅ appspec.yaml generated:"
+          cat appspec.yaml
+
+      # ── Step 5 ─────────────────────────────────────────────
+      # Trigger CodeDeploy Blue/Green deployment using the new task def
+      - name: Deploy via CodeDeploy (Blue/Green)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          codedeploy-application: ${{ env.CODEDEPLOY_APP }}
+          codedeploy-deployment-group: ${{ env.CODEDEPLOY_DEPLOYMENT_GROUP }}
+          codedeploy-appspec: appspec.yaml

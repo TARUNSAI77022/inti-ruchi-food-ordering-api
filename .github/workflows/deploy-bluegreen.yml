@@ -76,6 +76,7 @@ jobs:
             VERSION_TAG="${GITHUB_REF#refs/tags/}"
             echo "Event: version tag push → tagging as $VERSION_TAG"
             echo "tags=$VERSION_TAG" >> $GITHUB_OUTPUT
+            echo "primary_tag=$VERSION_TAG" >> $GITHUB_OUTPUT
           else
             echo "Event: branch push → tagging as latest + build-$SHORT_SHA"
             echo "tags=latest,build-$SHORT_SHA" >> $GITHUB_OUTPUT
@@ -103,9 +104,10 @@ jobs:
 
             echo "Pushing → $FULL_IMAGE"
             docker push "$FULL_IMAGE"
-            
-            echo "image_uri=$FULL_IMAGE" >> $GITHUB_OUTPUT
           done
+          
+          PRIMARY_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:${{ steps.set-tags.outputs.primary_tag }}"
+          echo "image_uri=$PRIMARY_IMAGE" >> $GITHUB_OUTPUT
           
           echo "✅ All images pushed to ECR successfully."
 

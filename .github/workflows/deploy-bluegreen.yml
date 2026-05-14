@@ -42,7 +42,7 @@ jobs:
     
     # Declare the output so the deploy job can use the exact image URI
     outputs:
-      image_uri: ${{ steps.set-image-uri.outputs.image_uri }}
+      image_uri: ${{ steps.build-image.outputs.image_uri }}
 
     steps:
       # ── Step 1 ─────────────────────────────────────────────
@@ -87,6 +87,7 @@ jobs:
       # ── Step 5 ─────────────────────────────────────────────
       # Build, tag, and push the Docker image
       - name: Build and Push Docker Image
+        id: build-image
         env:
           ECR_REGISTRY:  ${{ steps.login-ecr.outputs.registry }}
           TARGET_TAGS:   ${{ steps.set-tags.outputs.tags }}
@@ -102,19 +103,11 @@ jobs:
 
             echo "Pushing → $FULL_IMAGE"
             docker push "$FULL_IMAGE"
+            
+            echo "image_uri=$FULL_IMAGE" >> $GITHUB_OUTPUT
           done
           
           echo "✅ All images pushed to ECR successfully."
-
-      # ── Step 6 ─────────────────────────────────────────────
-      # Output the exact image URI for the deployment job to use
-      - name: Output Image URI for Deployment
-        id: set-image-uri
-        if: github.ref == 'refs/heads/main'
-        run: |
-          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.set-tags.outputs.primary_tag }}"
-          echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
-          echo "Deployment will use image: $IMAGE_URI"
 
   # ──────────────────────────────────────────────────────────
   # JOB 2: Deploy to ECS using AWS CodeDeploy (Blue/Green)

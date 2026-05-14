@@ -39,10 +39,6 @@ jobs:
     name: Build and Push Docker Image to ECR
     runs-on: ubuntu-latest
     environment: main
-    
-    # Declare the output so the deploy job can use the exact image URI
-    outputs:
-      image_uri: ${{ steps.build-image.outputs.image_uri }}
 
     steps:
       # ── Step 1 ─────────────────────────────────────────────
@@ -107,9 +103,17 @@ jobs:
           done
           
           PRIMARY_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:${{ steps.set-tags.outputs.primary_tag }}"
-          echo "image_uri=$PRIMARY_IMAGE" >> $GITHUB_OUTPUT
+          echo "$PRIMARY_IMAGE" > image-uri.txt
           
           echo "✅ All images pushed to ECR successfully."
+
+      # ── Step 6 ─────────────────────────────────────────────
+      # Upload the image URI as an artifact for the deployment job
+      - name: Upload Image URI Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-uri
+          path: image-uri.txt
 
   # ──────────────────────────────────────────────────────────
   # JOB 2: Deploy to ECS using AWS CodeDeploy (Blue/Green)
@@ -146,6 +150,21 @@ jobs:
             --query taskDefinition > task-definition.json
 
       # ── Step 3 ─────────────────────────────────────────────
+      # Download the image URI artifact
+      - name: Download Image URI Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: image-uri
+
+      # ── Step 4 ─────────────────────────────────────────────
+      # Read the image URI into the environment
+      - name: Read Image URI
+        run: |
+          IMAGE_URI=$(cat image-uri.txt)
+          echo "Using IMAGE_URI=$IMAGE_URI"
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+      # ── Step 5 ─────────────────────────────────────────────
       # Insert the new ECR image URI into the task definition JSON
       - name: Render ECS Task Definition
         id: render-task-def
@@ -153,9 +172,9 @@ jobs:
         with:
           task-definition: task-definition.json
           container-name: ${{ secrets.CONTAINER_NAME }}
-          image: ${{ needs.build-and-push.outputs.image_uri }}
+          image: ${{ env.IMAGE_URI }}
 
-      # ── Step 4 ─────────────────────────────────────────────
+      # ── Step 6 ─────────────────────────────────────────────
       # Generate the AppSpec file required by AWS CodeDeploy
       - name: Generate AppSpec file dynamically
         run: |
@@ -190,7 +209,7 @@ jobs:
           echo "✅ appspec.yaml generated:"
           cat appspec.yaml
 
-      # ── Step 5 ─────────────────────────────────────────────
+      # ── Step 7 ─────────────────────────────────────────────
       # Trigger CodeDeploy Blue/Green deployment using the new task def
       - name: Deploy via CodeDeploy (Blue/Green)
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2

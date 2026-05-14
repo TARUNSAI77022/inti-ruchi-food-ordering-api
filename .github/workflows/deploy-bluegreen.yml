@@ -145,12 +145,12 @@ jobs:
 
       # ── Step 3 ─────────────────────────────────────────────
       # Insert the new ECR image URI into the task definition JSON
-      - name: Render new image into Task Definition
+      - name: Render ECS Task Definition
         id: render-task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: task-definition.json
-          container-name: ${{ env.CONTAINER_NAME }}
+          container-name: ${{ secrets.CONTAINER_NAME }}
           image: ${{ needs.build-and-push.outputs.image_uri }}
 
       # ── Step 4 ─────────────────────────────────────────────
